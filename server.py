@@ -148,26 +148,25 @@ TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body r
             image_public_urls = save_and_get_public_url_from_image(image_data, user_prompt)
             print("Google Drive returned URLs:", image_public_urls)
             # Check for error returned from Drive function
-            # Check for error returned from Drive function
             if isinstance(image_public_urls, dict) and image_public_urls.get("error"):
                 slack_message = {
                     "response_type": "ephemeral",
                     "text": f"Error uploading image: {image_public_urls.get('error')}"
                 }
             else:
-            slack_message = {
-                "response_type": "in_channel",
-                "text": "Here are your files:",
-                "blocks": [
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": "Here are your generated images:\n" + "\n".join(image_public_urls)
+                slack_message = {
+                    "response_type": "in_channel",
+                    "text": "Here are your generated of TMAI images:",
+                    "blocks": [
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": "\n".join(image_public_urls)
+                            }
                         }
-                    }
-                ]
-            }
+                    ]
+                }
 
         else:
             print("No image data received from Replicate.")
