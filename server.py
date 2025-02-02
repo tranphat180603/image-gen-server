@@ -51,7 +51,7 @@ def save_and_get_public_url_from_image(image_data_list, user_prompt):
         image_bytes = image_data.read()
         
         # Define a safe file name using part of the user prompt (limit length)
-        file_name = f"TMAI_{user_prompt[:20]}_{int(time.time())}_{idx+1}.png"
+        file_name = f"TMAI_{int(time.time())}_{idx+1}.png"
         
         # Save image to Google Drive
         upload_url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
@@ -174,6 +174,7 @@ TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body r
             
                 slack_message = {
                     "response_type": "in_channel",
+                    "text": "Must have this field, accordinging to o1",
                     "blocks": blocks
                 }
         else:
