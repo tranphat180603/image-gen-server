@@ -5,6 +5,7 @@ import replicate
 import threading
 import json
 import time
+import json
 
 app = Flask(__name__)
 
@@ -191,6 +192,7 @@ TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body r
         }
     
     print("Posting final message to Slack via response_url:", response_url)
+    print("Final Slack payload:", json.dumps(slack_message, indent=2))
     resp = requests.post(response_url, json=slack_message)
     print(f"Slack response update status: {resp.status_code}, body: {resp.text}")
 
