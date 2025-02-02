@@ -26,11 +26,15 @@ def slack_command():
         elif token.startswith("--num_outputs="):
             num_outputs = int(token.split("=", 1)[1])
 
-
+    TMAI_prefix = """
+    TMAI, a yellow robot which has a rounded rectangular head with glossy black eyes. 
+    TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body ratio. TMAI’s size is equal to a 7-year-old kid.
+    """
     # Build the Replicate API payload
     payload = {
         "version": REPLICATE_VERSION,
         "input": {
+            "prompt": TMAI_prefix + text
             "model": "dev",
             "go_fast": False,
             "lora_scale": 1,
