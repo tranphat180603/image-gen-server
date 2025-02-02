@@ -13,9 +13,9 @@ REPLICATE_API_TOKEN = os.environ.get("REPLICATE_API_TOKEN")
 REPLICATE_VERSION = "a3409648730239101538d4cf79f2fdb0e068a5c7e6509ad86ab3fae09c4d6ef8"
 
 # Google Drive settings (example values)
-CLIENT_ID = "87176438828-ppjnlepvhhvt7n3ctej6napr299r2e7n.apps.googleusercontent.com"
-CLIENT_SECRET = "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"
-REFRESH_TOKEN = "1//044dJM9CUUhLhCgYIARAAGAQSNwF-L9IrlW8RvPw9jKqqt9UI-zRi2hLvAn7QvjDtgzbi7Ohp6JA3xGysPrKVpuFzSH5p5vuBm_M"
+CLIENT_ID = os.environ.get("CLIENT_ID")
+CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
+REFRESH_TOKEN = os.environ.get("REFRESH_TOKEN")
 folder_id = "1_B31euFkFoYAbzKGNyNu2bgc2uKb-qSE"  # Google Drive folder id
 
 def save_and_get_public_url_from_image(image_data, user_prompt):
