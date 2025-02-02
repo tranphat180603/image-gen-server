@@ -23,7 +23,7 @@ def upload_file_to_slack_external(file_name, image_bytes, channel_id, title=None
     get_url = "https://slack.com/api/files.getUploadURLExternal"
     headers = {
         "Authorization": f"Bearer {SLACK_BOT_TOKEN}",
-        "Content-Type": "application/json"  # use exact content-type without charset
+        "Content-Type": "application/json; charset=utf-8"
     }
     
     # Ensure the payload has the required fields.
