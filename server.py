@@ -26,10 +26,12 @@ def upload_file_to_slack_external(file_name, image_bytes, channel_id, title=None
         "Authorization": f"Bearer {SLACK_BOT_TOKEN}",
         "Content-Type": "application/json;charset=utf-8"
     }
+    # Include "length": number of bytes in the file
     payload = {
         "filename": file_name,
         "title": title or file_name,
-        "filetype": filetype
+        "filetype": filetype,
+        "length": len(image_bytes)
     }
     resp = requests.post(get_url, headers=headers, json=payload)
     data = resp.json()
@@ -49,8 +51,7 @@ def upload_file_to_slack_external(file_name, image_bytes, channel_id, title=None
     complete_url = "https://slack.com/api/files.completeUploadExternal"
     complete_payload = {
         "file_id": file_id,
-        # Share the file in the channel where the command was invoked.
-        "channels": channel_id
+        "channels": channel_id  # Share the file in the channel where the command was invoked.
     }
     complete_resp = requests.post(complete_url, headers=headers, json=complete_payload)
     complete_data = complete_resp.json()
@@ -60,6 +61,7 @@ def upload_file_to_slack_external(file_name, image_bytes, channel_id, title=None
     file_info = complete_data.get("file", {})
     permalink = file_info.get("permalink_public") or file_info.get("permalink")
     return {"file_id": file_id, "permalink": permalink}
+
 
 def upload_images_to_slack(image_data_list, channel_id, user_prompt):
     """
