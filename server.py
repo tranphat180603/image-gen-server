@@ -12,53 +12,73 @@ app = Flask(__name__)
 REPLICATE_API_TOKEN = os.environ.get("REPLICATE_API_TOKEN")
 REPLICATE_VERSION = "a3409648730239101538d4cf79f2fdb0e068a5c7e6509ad86ab3fae09c4d6ef8"
 
-# Slack settings
+# Slack settings (make sure this is a modern bot token with proper scopes)
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
+
+def upload_file_to_slack_external(file_name, image_bytes, channel_id, title=None, filetype="png"):
+    """
+    Upload a file to Slack using the new external upload methods.
+    Returns a dict with file_id and permalink on success, or an "error" key.
+    """
+    # Step 1: Call files.getUploadURLExternal to obtain a pre-signed upload URL.
+    get_url = "https://slack.com/api/files.getUploadURLExternal"
+    headers = {
+        "Authorization": f"Bearer {SLACK_BOT_TOKEN}",
+        "Content-Type": "application/json;charset=utf-8"
+    }
+    payload = {
+        "filename": file_name,
+        "title": title or file_name,
+        "filetype": filetype
+    }
+    resp = requests.post(get_url, headers=headers, json=payload)
+    data = resp.json()
+    if not data.get("ok"):
+        return {"error": f"Error getting upload URL: {data}"}
+    upload_url = data.get("upload_url")
+    file_id = data.get("file_id")
+    if not upload_url or not file_id:
+        return {"error": "Missing upload_url or file_id in response from files.getUploadURLExternal"}
+
+    # Step 2: Upload the file bytes to the pre-signed URL.
+    put_resp = requests.put(upload_url, data=image_bytes, headers={"Content-Type": "application/octet-stream"})
+    if put_resp.status_code != 200:
+        return {"error": f"Error uploading file bytes: status {put_resp.status_code}, {put_resp.text}"}
+
+    # Step 3: Finalize the upload by calling files.completeUploadExternal.
+    complete_url = "https://slack.com/api/files.completeUploadExternal"
+    complete_payload = {
+        "file_id": file_id,
+        # Share the file in the channel where the command was invoked.
+        "channels": channel_id
+    }
+    complete_resp = requests.post(complete_url, headers=headers, json=complete_payload)
+    complete_data = complete_resp.json()
+    if not complete_data.get("ok"):
+        return {"error": f"Error completing file upload: {complete_data}"}
+    # Slack returns the file object; get the permalink to display.
+    file_info = complete_data.get("file", {})
+    permalink = file_info.get("permalink_public") or file_info.get("permalink")
+    return {"file_id": file_id, "permalink": permalink}
 
 def upload_images_to_slack(image_data_list, channel_id, user_prompt):
     """
-    Upload each image (file-like object) directly to Slack using files.upload.
-    Returns a list of Slack file permalinks if successful, or a dict with "error".
+    For each image (a file-like object), upload it using the new external upload flow.
+    Returns a list of permalinks or a dict with an "error".
     """
     if not SLACK_BOT_TOKEN:
         return {"error": "SLACK_BOT_TOKEN not set or invalid."}
-
-    slack_upload_url = "https://slack.com/api/files.upload"
-    headers = {
-        "Authorization": f"Bearer {SLACK_BOT_TOKEN}"
-    }
-
+    
     file_links = []
     for idx, image_data in enumerate(image_data_list):
-        # Read bytes from the Replicate image-like object
+        # Read bytes from the image file-like object.
         image_bytes = image_data.read()
-
-        # We’ll name it something like TMAI_1675459200_1.png
         file_name = f"TMAI_{int(time.time())}_{idx+1}.png"
-
-        # Slack requires a multipart/form-data upload with 'file' param:
-        files = {
-            "file": (file_name, image_bytes, "image/png")
-        }
-        # Send to the same channel that invoked the slash command,
-        # or you can set a different channel if you prefer.
-        data = {
-            "channels": channel_id,
-            # This text appears as the file's initial comment
-            "initial_comment": f"Generated image {idx+1} for prompt: {user_prompt[:50]}..."
-        }
-
-        resp = requests.post(slack_upload_url, headers=headers, files=files, data=data)
-        resp_json = resp.json()
-        if not resp_json.get("ok"):
-            return {"error": f"Slack file upload failed: {resp_json}"}
-        
-        # Slack returns file metadata. We'll store the permalink to display in final message.
-        file_permalink = resp_json["file"].get("permalink")
-        file_links.append(file_permalink or "No permalink found")
-
+        result = upload_file_to_slack_external(file_name, image_bytes, channel_id, title=f"Generated image {idx+1}")
+        if result.get("error"):
+            return {"error": result.get("error")}
+        file_links.append(result.get("permalink", "No permalink found"))
     return file_links
-
 
 def process_image_generation(user_prompt, aspect_ratio, num_outputs, response_url, channel_id):
     print("Starting image generation with Replicate...")
@@ -69,7 +89,7 @@ TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body r
     full_prompt = TMAI_prefix + "\n" + user_prompt
     print("Full prompt sent to Replicate:")
     print(full_prompt)
-
+    
     try:
         output = replicate.run(
             "token-metrics/tmai-imagegen-iter3:" + REPLICATE_VERSION,
@@ -91,28 +111,26 @@ TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body r
             }
         )
         print("Replicate returned output.")
-
+        # Decide on the image data list based on the number of outputs
         if num_outputs == 1:
             image_data = [output[0]] if output else None
         elif num_outputs == 4:
             image_data = output
         else:
             image_data = [output[0]] if output else None
-
+        
         if image_data:
-            print("Uploading image(s) to Slack...")
-            upload_result = upload_images_to_slack(image_data, channel_id, user_prompt)
-            print("Slack upload returned:", upload_result)
-
-            if isinstance(upload_result, dict) and upload_result.get("error"):
-                # We had an error from the Slack upload
+            print("Uploading image(s) to Slack using the new external upload methods...")
+            image_public_urls = upload_images_to_slack(image_data, channel_id, user_prompt)
+            print("Slack upload returned:", image_public_urls)
+            if isinstance(image_public_urls, dict) and image_public_urls.get("error"):
                 slack_message = {
                     "response_type": "ephemeral",
-                    "text": f"Error uploading image(s) to Slack: {upload_result.get('error')}"
+                    "text": f"Error uploading image(s) to Slack: {image_public_urls.get('error')}"
                 }
             else:
-                # Build final text with the Slack file permalinks
-                link_text = "\n".join(upload_result)
+                # Build final text with the Slack file permalinks.
+                link_text = "\n".join(image_public_urls)
                 slack_message = {
                     "response_type": "in_channel",
                     "text": "Here are your generated TMAI images:\n" + link_text
@@ -123,22 +141,20 @@ TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body r
                 "response_type": "ephemeral",
                 "text": "Failed to generate an image."
             }
-
     except Exception as e:
         print("Exception during image generation:", str(e))
         slack_message = {
             "response_type": "ephemeral",
             "text": f"An error occurred: {str(e)}"
         }
-
+    
     print("Posting final message to Slack via response_url:", response_url)
+    print("Final Slack payload:", json.dumps(slack_message, indent=2))
     resp = requests.post(response_url, json=slack_message)
     print(f"Slack response update status: {resp.status_code}, body: {resp.text}")
 
-
 @app.route('/slack/command', methods=['POST'])
 def slack_command_endpoint():
-    # Slack includes a channel_id in slash commands so you can post back to the same channel
     channel_id = request.form.get("channel_id")
     response_url = request.form.get("response_url")
     text = request.form.get("text", "")
@@ -146,7 +162,7 @@ def slack_command_endpoint():
     print(f"Received Slack channel_id: {channel_id}")
     print(f"Received Slack response_url: {response_url}")
     print("Received Slack text:", text)
-
+    
     # Default parameter values
     aspect_ratio = "1:1"
     num_outputs = 1
@@ -190,23 +206,22 @@ def slack_command_endpoint():
             idx += 1
 
     print(f"Parsed parameters: aspect_ratio={aspect_ratio}, num_outputs={num_outputs}")
-
-    # Immediately respond to Slack to acknowledge receipt
+    
+    # Immediately respond to Slack to acknowledge receipt.
     ack_response = {
         "response_type": "ephemeral",
         "text": "Processing your image... This might take a moment."
     }
     print("Sending immediate acknowledgement to Slack.")
-
-    # Kick off background thread to generate and upload images
+    
+    # Start a background thread to process image generation.
     thread = threading.Thread(
         target=process_image_generation,
         args=(user_prompt, aspect_ratio, num_outputs, response_url, channel_id)
     )
     thread.start()
-
+    
     return jsonify(ack_response)
-
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
