@@ -34,7 +34,7 @@ def slack_command():
     payload = {
         "version": REPLICATE_VERSION,
         "input": {
-            "prompt": TMAI_prefix + text
+            "prompt": TMAI_prefix + text,
             "model": "dev",
             "go_fast": False,
             "lora_scale": 1,
@@ -46,7 +46,8 @@ def slack_command():
             "output_quality": 80,
             "prompt_strength": 0.8,
             "extra_lora_scale": 1,
-            "num_inference_steps": 28
+            "num_inference_steps": 28,
+            "disable_safety_checker": True
         }
     }
     headers = {
