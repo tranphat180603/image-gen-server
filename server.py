@@ -5,7 +5,6 @@ import replicate
 import threading
 import json
 import time
-import json
 
 app = Flask(__name__)
 
@@ -13,105 +12,64 @@ app = Flask(__name__)
 REPLICATE_API_TOKEN = os.environ.get("REPLICATE_API_TOKEN")
 REPLICATE_VERSION = "a3409648730239101538d4cf79f2fdb0e068a5c7e6509ad86ab3fae09c4d6ef8"
 
-# Google Drive settings (example values)
-CLIENT_ID = os.environ.get("CLIENT_ID")
-CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
-REFRESH_TOKEN = os.environ.get("REFRESH_TOKEN")
-folder_id = "1_B31euFkFoYAbzKGNyNu2bgc2uKb-qSE"  # Google Drive folder id
+# Slack settings
+SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 
-def save_and_get_public_url_from_image(image_data_list, user_prompt):
-    print("Starting Google Drive upload for images...")
-    # First, get a new access token from Google
-    token_url = "https://oauth2.googleapis.com/token"
-    payload = {
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-        "refresh_token": REFRESH_TOKEN,
-        "grant_type": "refresh_token",
+def upload_images_to_slack(image_data_list, channel_id, user_prompt):
+    """
+    Upload each image (file-like object) directly to Slack using files.upload.
+    Returns a list of Slack file permalinks if successful, or a dict with "error".
+    """
+    if not SLACK_BOT_TOKEN:
+        return {"error": "SLACK_BOT_TOKEN not set or invalid."}
+
+    slack_upload_url = "https://slack.com/api/files.upload"
+    headers = {
+        "Authorization": f"Bearer {SLACK_BOT_TOKEN}"
     }
-    token_resp = requests.post(token_url, data=payload)
-    if token_resp.status_code != 200:
-        error_msg = f"Failed to get new GDrive access token. Status={token_resp.status_code}, Body={token_resp.text}"
-        print(error_msg)
-        return {"error": error_msg}
-    token_json = token_resp.json()
-    GDRIVE_ACCESS_TOKEN = token_json.get("access_token")
-    if not GDRIVE_ACCESS_TOKEN:
-        error_msg = f"Could not parse 'access_token' from Google response: {token_json}"
-        print(error_msg)
-        return {"error": error_msg}
-    
-    # Prepare the authorization header using the new token
-    gdrive_headers = {"Authorization": f"Bearer {GDRIVE_ACCESS_TOKEN}"}
-    urls = []
-    
-    # Iterate over each image in the list
-    for idx, image_data in enumerate(image_data_list):
-        print(f"Uploading image {idx+1} to Google Drive...")
-        # Read the content (bytes) of the image
-        image_bytes = image_data.read()
-        
-        # Define a safe file name using part of the user prompt (limit length)
-        file_name = f"TMAI_{int(time.time())}_{idx+1}.png"
-        
-        # Save image to Google Drive
-        upload_url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
-        metadata = {
-            "name": file_name,
-            "parents": [folder_id]
-        }
-        files_data = {
-            "metadata": ("metadata.json", json.dumps(metadata), "application/json"),
-            "file": (file_name, image_bytes, "image/png"),
-        }
-        create_resp = requests.post(upload_url, headers=gdrive_headers, files=files_data)
-        if create_resp.status_code != 200:
-            error_msg = f"Failed to upload file. Status={create_resp.status_code}, Body={create_resp.text}"
-            print(error_msg)
-            return {"error": error_msg}
-        
-        upload_json = create_resp.json()
-        drive_file_id = upload_json.get("id")
-        if not drive_file_id:
-            error_msg = "Drive file id not found in upload response."
-            print(error_msg)
-            return {"error": error_msg}
-        
-        print(f"Image uploaded, file ID: {drive_file_id}")
-        # Generate public URL by setting the file's permission to public
-        permission_url = f"https://www.googleapis.com/drive/v3/files/{drive_file_id}/permissions"
-        permission_body = {"role": "reader", "type": "anyone"}
-        perm_resp = requests.post(permission_url, headers=gdrive_headers, json=permission_body)
-        if perm_resp.status_code not in [200, 204]:
-            error_msg = f"Failed to set file permissions. Status={perm_resp.status_code}, Body={perm_resp.text}"
-            print(error_msg)
-            return {"error": error_msg}
-        
-        # Retrieve detailed metadata, including public links
-        file_metadata_url = f"https://www.googleapis.com/drive/v3/files/{drive_file_id}?fields=id,name,mimeType,size,webViewLink,webContentLink"
-        meta_resp = requests.get(file_metadata_url, headers=gdrive_headers)
-        if meta_resp.status_code != 200:
-            error_msg = f"Failed to retrieve file metadata. Status={meta_resp.status_code}, Body={meta_resp.text}"
-            print(error_msg)
-            return {"error": error_msg}
-        
-        meta_data = meta_resp.json()
-        public_link = f"https://drive.google.com/uc?export=view&id={drive_file_id}"
-        print(f"Image {idx+1} public URL: {public_link}")
-        urls.append(public_link)
-            
-    return urls
 
-def process_image_generation(user_prompt, aspect_ratio, num_outputs, response_url):
+    file_links = []
+    for idx, image_data in enumerate(image_data_list):
+        # Read bytes from the Replicate image-like object
+        image_bytes = image_data.read()
+
+        # We’ll name it something like TMAI_1675459200_1.png
+        file_name = f"TMAI_{int(time.time())}_{idx+1}.png"
+
+        # Slack requires a multipart/form-data upload with 'file' param:
+        files = {
+            "file": (file_name, image_bytes, "image/png")
+        }
+        # Send to the same channel that invoked the slash command,
+        # or you can set a different channel if you prefer.
+        data = {
+            "channels": channel_id,
+            # This text appears as the file's initial comment
+            "initial_comment": f"Generated image {idx+1} for prompt: {user_prompt[:50]}..."
+        }
+
+        resp = requests.post(slack_upload_url, headers=headers, files=files, data=data)
+        resp_json = resp.json()
+        if not resp_json.get("ok"):
+            return {"error": f"Slack file upload failed: {resp_json}"}
+        
+        # Slack returns file metadata. We'll store the permalink to display in final message.
+        file_permalink = resp_json["file"].get("permalink")
+        file_links.append(file_permalink or "No permalink found")
+
+    return file_links
+
+
+def process_image_generation(user_prompt, aspect_ratio, num_outputs, response_url, channel_id):
     print("Starting image generation with Replicate...")
     TMAI_prefix = """
-TMAI, a yellow robot which has a rounded rectangular head with glossy black eyes. 
+TMAI, a yellow robot which has a rounded rectangular head with glossy black eyes.
 TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body ratio. TMAI’s size is equal to a 7-year-old kid.
 """
     full_prompt = TMAI_prefix + "\n" + user_prompt
     print("Full prompt sent to Replicate:")
     print(full_prompt)
-    
+
     try:
         output = replicate.run(
             "token-metrics/tmai-imagegen-iter3:" + REPLICATE_VERSION,
@@ -133,70 +91,67 @@ TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body r
             }
         )
         print("Replicate returned output.")
-        # Decide on the image data list based on number of outputs
+
         if num_outputs == 1:
             image_data = [output[0]] if output else None
         elif num_outputs == 4:
             image_data = output
         else:
             image_data = [output[0]] if output else None
-        
+
         if image_data:
-            print("Uploading image(s) to Google Drive...")
-            image_public_urls = save_and_get_public_url_from_image(image_data, user_prompt)
-            print("Google Drive returned URLs:", image_public_urls)
-            # Check for error returned from Drive function
-            if isinstance(image_public_urls, dict) and image_public_urls.get("error"):
+            print("Uploading image(s) to Slack...")
+            upload_result = upload_images_to_slack(image_data, channel_id, user_prompt)
+            print("Slack upload returned:", upload_result)
+
+            if isinstance(upload_result, dict) and upload_result.get("error"):
+                # We had an error from the Slack upload
                 slack_message = {
                     "response_type": "ephemeral",
-                    "text": f"Error uploading image: {image_public_urls.get('error')}"
+                    "text": f"Error uploading image(s) to Slack: {upload_result.get('error')}"
                 }
             else:
+                # Build final text with the Slack file permalinks
+                link_text = "\n".join(upload_result)
                 slack_message = {
                     "response_type": "in_channel",
-                    "text": "Here are your generated of TMAI images:",
-                    "blocks": [
-                        {
-                            "type": "section",
-                            "text": {
-                                "type": "mrkdwn",
-                                "text": "\n".join(image_public_urls)
-                            }
-                        }
-                    ]
+                    "text": "Here are your generated TMAI images:\n" + link_text
                 }
-
         else:
             print("No image data received from Replicate.")
             slack_message = {
                 "response_type": "ephemeral",
                 "text": "Failed to generate an image."
             }
+
     except Exception as e:
         print("Exception during image generation:", str(e))
         slack_message = {
             "response_type": "ephemeral",
             "text": f"An error occurred: {str(e)}"
         }
-    
+
     print("Posting final message to Slack via response_url:", response_url)
-    print("Final Slack payload:", json.dumps(slack_message, indent=2))
     resp = requests.post(response_url, json=slack_message)
     print(f"Slack response update status: {resp.status_code}, body: {resp.text}")
 
+
 @app.route('/slack/command', methods=['POST'])
 def slack_command_endpoint():
-    # Immediately extract response_url and user input
+    # Slack includes a channel_id in slash commands so you can post back to the same channel
+    channel_id = request.form.get("channel_id")
     response_url = request.form.get("response_url")
+    text = request.form.get("text", "")
+
+    print(f"Received Slack channel_id: {channel_id}")
     print(f"Received Slack response_url: {response_url}")
-    text = request.form.get('text', '')
     print("Received Slack text:", text)
-    
+
     # Default parameter values
     aspect_ratio = "1:1"
     num_outputs = 1
 
-    # Split input into prompt and parameter parts (assuming parameters are appended at the end)
+    # Split input into prompt and parameter parts
     if "--" in text:
         parts = text.split("--", 1)
         user_prompt = parts[0].strip()
@@ -235,19 +190,23 @@ def slack_command_endpoint():
             idx += 1
 
     print(f"Parsed parameters: aspect_ratio={aspect_ratio}, num_outputs={num_outputs}")
-    
+
     # Immediately respond to Slack to acknowledge receipt
     ack_response = {
         "response_type": "ephemeral",
         "text": "Processing your image... This might take a moment."
     }
     print("Sending immediate acknowledgement to Slack.")
-    
-    # Start a background thread to process image generation
-    thread = threading.Thread(target=process_image_generation, args=(user_prompt, aspect_ratio, num_outputs, response_url))
+
+    # Kick off background thread to generate and upload images
+    thread = threading.Thread(
+        target=process_image_generation,
+        args=(user_prompt, aspect_ratio, num_outputs, response_url, channel_id)
+    )
     thread.start()
-    
+
     return jsonify(ack_response)
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
