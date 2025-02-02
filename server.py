@@ -96,9 +96,7 @@ def save_and_get_public_url_from_image(image_data_list, user_prompt):
             return {"error": error_msg}
         
         meta_data = meta_resp.json()
-        public_link = meta_data.get("webViewLink") or meta_data.get("webContentLink")
-        if not public_link:
-            public_link = f"https://drive.google.com/file/d/{drive_file_id}/view"
+        public_link = f"https://drive.google.com/uc?export=view&id={drive_file_id}"
         print(f"Image {idx+1} public URL: {public_link}")
         urls.append(public_link)
             
