@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import requests
 import os
 import json
+import replicate
 
 app = Flask(__name__)
 
@@ -21,20 +22,22 @@ def slack_command():
     
     # Very simple parsing: expect input like "aspect_ratio=16:9"
     for token in text.split():
-        if token.startswith("--aspect_ratio="):
-            aspect_ratio = token.split("=", 1)[1]
-        elif token.startswith("--num_outputs="):
-            num_outputs = int(token.split("=", 1)[1])
+        if token.startswith("--aspect_ratio"):
+            aspect_ratio = token.split(" ", 1)[1]
+        elif token.startswith("--num_outputs"):
+            num_outputs = int(token.split(" ", 1)[1])
+
+    user_prompt = text.split("--", 1)[0]
 
     TMAI_prefix = """
     TMAI, a yellow robot which has a rounded rectangular head with glossy black eyes. 
     TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body ratio. TMAI’s size is equal to a 7-year-old kid.
     """
     # Build the Replicate API payload
-    payload = {
-        "version": REPLICATE_VERSION,
-        "input": {
-            "prompt": TMAI_prefix + text,
+    output = replicate.run(
+        "token-metrics/tmai-imagegen-iter3:a3409648730239101538d4cf79f2fdb0e068a5c7e6509ad86ab3fae09c4d6ef8",
+        input = {
+            "prompt": TMAI_prefix + user_prompt,
             "model": "dev",
             "go_fast": False,
             "lora_scale": 1,
@@ -49,26 +52,9 @@ def slack_command():
             "num_inference_steps": 28,
             "disable_safety_checker": True
         }
-    }
-    headers = {
-        "Authorization": f"Bearer {REPLICATE_API_TOKEN}",
-        "Content-Type": "application/json",
-        "Prefer": "wait"
-    }
+    )
     
-    # Call the Replicate API
-    replicate_url = "https://api.replicate.com/v1/predictions"
-    replicate_response = requests.post(replicate_url, headers=headers, json=payload)
-    
-    if replicate_response.status_code != 201:
-        return jsonify({
-            "response_type": "ephemeral",
-            "text": "There was an error generating the image."
-        })
-    
-    # Extract the image URL from the response (this depends on Replicate's API response structure)
-    result = replicate_response.json()
-    image_url = result.get("output", [None])[0]
+    image_url = output[0]
     if not image_url:
         return jsonify({
             "response_type": "ephemeral",
