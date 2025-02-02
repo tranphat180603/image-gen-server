@@ -169,7 +169,7 @@ TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body r
                 for url in image_public_urls:
                     blocks.append({
                         "type": "image",
-                        "image_url": url,
+                        "text": url,
                         "alt_text": "Generated Image"
                     })
             
