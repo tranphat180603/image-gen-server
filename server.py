@@ -155,29 +155,20 @@ TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body r
                     "text": f"Error uploading image: {image_public_urls.get('error')}"
                 }
             else:
-                # Build blocks with all the image URLs
-                blocks = [
+            slack_message = {
+                "response_type": "in_channel",
+                "text": "Here are your files:",
+                "blocks": [
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": f"Here are your generated images with aspect ratio *{aspect_ratio}*:"
+                            "text": "Here are your generated images:\n" + "\n".join(image_public_urls)
                         }
                     }
                 ]
-                # For each URL in the list, add an image block
-                for url in image_public_urls:
-                    blocks.append({
-                        "type": "image",
-                        "text": url,
-                        "alt_text": "Generated Image"
-                    })
-            
-                slack_message = {
-                    "response_type": "in_channel",
-                    "text": "Must have this field, accordinging to o1",
-                    "blocks": blocks
-                }
+            }
+
         else:
             print("No image data received from Replicate.")
             slack_message = {
