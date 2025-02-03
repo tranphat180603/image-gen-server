@@ -29,8 +29,6 @@ def upload_file_to_slack_external(file_name, image_bytes, channel_id, title=None
     # Ensure the payload has the required fields.
     payload = {
         "filename": file_name,
-        "title": title or file_name,
-        "filetype": filetype,
         "length": len(image_bytes)
     }
     
