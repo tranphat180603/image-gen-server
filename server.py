@@ -56,7 +56,9 @@ def upload_file_to_slack_external(file_name, image_bytes, channel_id, title=None
     # Step 3: Finalize the upload.
     complete_url = "https://slack.com/api/files.completeUploadExternal"
     complete_payload = {
-        "file_id": file_id,
+        "files": [
+        {"id": file_id}
+        ],
         "channels": channel_id
     }
     complete_resp = requests.post(complete_url, headers=headers, data=json.dumps(complete_payload))
