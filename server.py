@@ -68,6 +68,7 @@ def upload_file_to_slack_external(file_name, image_bytes, channel_id, title=None
     # 4) Return the permalink
     file_info = complete_data.get("file", {})
     permalink = file_info.get("permalink_public") or file_info.get("permalink")
+    print(f"Permalinks: {permalink}")
     return {"file_id": file_id, "permalink": permalink}
 
 
@@ -93,10 +94,9 @@ def upload_images_to_slack(image_data_list, channel_id, user_prompt):
 def process_image_generation(user_prompt, aspect_ratio, num_outputs, response_url, channel_id):
     print("Starting image generation with Replicate...")
     TMAI_prefix = """
-TMAI, a yellow robot which has a rounded rectangular head with glossy black eyes.
-TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body ratio. TMAI’s size is equal to a 7-year-old kid.
+TMAI, a yellow robot which has a rounded rectangular head with glossy black eyes. TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body ratio. TMAI’s size is equal to a 7-year-old kid.
 """
-    full_prompt = TMAI_prefix + "\n" + user_prompt
+    full_prompt = TMAI_prefix + "\n" + "TMAI"+user_prompt
     print("Full prompt sent to Replicate:")
     print(full_prompt)
     
@@ -139,11 +139,9 @@ TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body r
                     "text": f"Error uploading image(s) to Slack: {image_public_urls.get('error')}"
                 }
             else:
-                # Build final text with the Slack file permalinks.
-                link_text = "\n".join(image_public_urls)
                 slack_message = {
                     "response_type": "in_channel",
-                    "text": "Here are your generated TMAI images:\n" + link_text
+                    "text": "Here are your generated TMAI images:\n"
                 }
         else:
             print("No image data received from Replicate.")
