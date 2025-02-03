@@ -192,7 +192,7 @@ def slack_command_endpoint(character):
     
     # Default parameter values
     aspect_ratio = "1:1"
-    num_outputs = 1
+    num_outputs = 4
 
     # Split input into prompt and parameter parts
     if "--" in text:
