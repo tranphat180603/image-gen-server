@@ -10,7 +10,8 @@ app = Flask(__name__)
 
 # Replicate settings
 REPLICATE_API_TOKEN = os.environ.get("REPLICATE_API_TOKEN")
-REPLICATE_VERSION = "a3409648730239101538d4cf79f2fdb0e068a5c7e6509ad86ab3fae09c4d6ef8"
+TMAI_VERSION = "a3409648730239101538d4cf79f2fdb0e068a5c7e6509ad86ab3fae09c4d6ef8"
+LUCKY_VERSION = "499a35887d318d3e889af1a5968850fb8f2b508095c73d04b8734c5b018ec43e"
 
 # Slack settings (make sure this is a modern bot token with proper scopes)
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
@@ -91,18 +92,13 @@ def upload_images_to_slack(image_data_list, channel_id, user_prompt):
         file_links.append(result.get("permalink", "No permalink found"))
     return file_links
 
-def process_image_generation(user_prompt, aspect_ratio, num_outputs, response_url, channel_id):
+def process_image_generation(user_prompt, aspect_ratio, num_outputs, response_url, channel_id, character):
     print("Starting image generation with Replicate...")
-    TMAI_prefix = """
-TMAI, a yellow robot which has a rounded rectangular head with glossy black eyes. TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body ratio. TMAI’s size is equal to a 7-year-old kid.
-"""
-    full_prompt = TMAI_prefix + "\n" + "TMAI"+user_prompt
-    print("Full prompt sent to Replicate:")
-    print(full_prompt)
-    
-    try:
+    if character == "TMAI":
+        TMAI_prefix = """TMAI, a yellow robot which has a rounded rectangular head with glossy black eyes. TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body ratio. TMAI’s size is equal to a 7-year-old kid."""
+        full_prompt = TMAI_prefix + "\n" + "TMAI "+user_prompt
         output = replicate.run(
-            "token-metrics/tmai-imagegen-iter3:" + REPLICATE_VERSION,
+            "token-metrics/tmai-imagegen-iter3:" + TMAI_VERSION,
             input={
                 "prompt": full_prompt,
                 "model": "dev",
@@ -120,15 +116,39 @@ TMAI, a yellow robot which has a rounded rectangular head with glossy black eyes
                 "disable_safety_checker": True
             }
         )
-        print("Replicate returned output.")
-        # Decide on the image data list based on the number of outputs
-        if num_outputs == 1:
-            image_data = [output[0]] if output else None
-        elif num_outputs == 4:
-            image_data = output
-        else:
-            image_data = [output[0]] if output else None
-        
+    elif character == "LUCKY":
+        LUCKY_prefix = """LUCKY, an orange French bulldog with upright ears."""
+        full_prompt = LUCKY_prefix + "\n" + "LUCKY " + user_prompt
+        output = replicate.run(
+            "token-metrics/lucky-imagegen-iter1:" + LUCKY_VERSION,
+            input={
+                "prompt": full_prompt,
+                "model": "dev",
+                "go_fast": False,
+                "lora_scale": 1,
+                "megapixels": "1",
+                "num_outputs": num_outputs,
+                "aspect_ratio": aspect_ratio,
+                "output_format": "png",
+                "guidance_scale": 3,
+                "output_quality": 80,
+                "prompt_strength": 0.8,
+                "extra_lora_scale": 1,
+                "num_inference_steps": 28,
+                "disable_safety_checker": True
+            }
+        )
+    print("Full prompt sent to Replicate:")
+    print(full_prompt)
+
+    # Decide on the image data list based on the number of outputs
+    if num_outputs == 1:
+        image_data = [output[0]] if output else None
+    elif num_outputs == 4:
+        image_data = output
+    else:
+        image_data = [output[0]] if output else None
+    try:
         if image_data:
             print("Uploading image(s) to Slack using the new external upload methods...")
             image_public_urls = upload_images_to_slack(image_data, channel_id, user_prompt)
@@ -141,7 +161,7 @@ TMAI, a yellow robot which has a rounded rectangular head with glossy black eyes
             else:
                 slack_message = {
                     "response_type": "in_channel",
-                    "text": "Here are your generated TMAI images:\n"
+                    "text": "Here are your generated images:\n"
                 }
         else:
             print("No image data received from Replicate.")
@@ -161,8 +181,7 @@ TMAI, a yellow robot which has a rounded rectangular head with glossy black eyes
     resp = requests.post(response_url, json=slack_message)
     print(f"Slack response update status: {resp.status_code}, body: {resp.text}")
 
-@app.route('/slack/command', methods=['POST'])
-def slack_command_endpoint():
+def slack_command_endpoint(character):
     channel_id = request.form.get("channel_id")
     response_url = request.form.get("response_url")
     text = request.form.get("text", "")
@@ -225,11 +244,19 @@ def slack_command_endpoint():
     # Start a background thread to process image generation.
     thread = threading.Thread(
         target=process_image_generation,
-        args=(user_prompt, aspect_ratio, num_outputs, response_url, channel_id)
+        args=(user_prompt, aspect_ratio, num_outputs, response_url, channel_id, character)
     )
     thread.start()
     
     return jsonify(ack_response)
+
+@app.route('/slack/TMAI', methods=['POST'])
+def slack_TMAI_endpoint():
+    return slack_command_endpoint(character = "TMAI")
+
+@app.route('/slack/LUCKY', methods=['POST'])
+def slack_LUCKY_endpoint():
+    return slack_command_endpoint(character = "LUCKY")
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
