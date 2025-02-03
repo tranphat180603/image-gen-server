@@ -20,23 +20,21 @@ def upload_file_to_slack_external(file_name, image_bytes, channel_id, title=None
     Upload a file to Slack using the new external upload methods.
     Returns a dict with file_id and permalink on success, or an "error" key.
     """
+    # Step 1: Call files.getUploadURLExternal using GET, with required parameters as query params.
     get_url = "https://slack.com/api/files.getUploadURLExternal"
     headers = {
-        "Authorization": f"Bearer {SLACK_BOT_TOKEN}",
-        "Content-Type": "application/json; charset=utf-8"
+        "Authorization": f"Bearer {SLACK_BOT_TOKEN}"
     }
     
-    # Ensure the payload has the required fields.
-    payload = {
+    # Pass required fields as query parameters
+    params = {
         "filename": file_name,
         "length": len(image_bytes)
     }
     
-    # Debug: print payload to verify values are set correctly.
-    print("Payload for files.getUploadURLExternal:", payload)
+    print("Query parameters for files.getUploadURLExternal:", params)
     
-    # Send as raw JSON string in the request body.
-    resp = requests.post(get_url, headers=headers, data=json.dumps(payload))
+    resp = requests.get(get_url, headers=headers, params=params)
     data = resp.json()
     if not data.get("ok"):
         return {"error": f"Error getting upload URL: {data}"}
@@ -47,9 +45,13 @@ def upload_file_to_slack_external(file_name, image_bytes, channel_id, title=None
         return {"error": "Missing upload_url or file_id in response from files.getUploadURLExternal"}
     
     # Step 2: Upload the file bytes to the pre-signed URL.
-    put_resp = requests.put(upload_url, data=image_bytes, headers={"Content-Type": "application/octet-stream"})
-    if put_resp.status_code != 200:
-        return {"error": f"Error uploading file bytes: status {put_resp.status_code}, {put_resp.text}"}
+    # According to the docs, this should be a POST request with multipart/form-data.
+    files = {
+        "filename": (file_name, image_bytes, "application/octet-stream")
+    }
+    post_resp = requests.post(upload_url, files=files)
+    if post_resp.status_code != 200:
+        return {"error": f"Error uploading file bytes: status {post_resp.status_code}, {post_resp.text}"}
     
     # Step 3: Finalize the upload.
     complete_url = "https://slack.com/api/files.completeUploadExternal"
@@ -62,12 +64,10 @@ def upload_file_to_slack_external(file_name, image_bytes, channel_id, title=None
     if not complete_data.get("ok"):
         return {"error": f"Error completing file upload: {complete_data}"}
     
-    # Slack returns the file object; get the permalink.
+    # Retrieve and return the permalink.
     file_info = complete_data.get("file", {})
     permalink = file_info.get("permalink_public") or file_info.get("permalink")
     return {"file_id": file_id, "permalink": permalink}
-
-
 
 def upload_images_to_slack(image_data_list, channel_id, user_prompt):
     """
