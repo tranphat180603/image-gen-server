@@ -117,7 +117,7 @@ def process_image_generation(user_prompt, aspect_ratio, num_outputs, response_ur
             }
         )
     elif character == "LUCKY":
-        LUCKY_prefix = """LUCKY, an orange French bulldog with upright ears."""
+        LUCKY_prefix = """LUCKY, an orange French bulldog with upright ears, always wearing a collar with the word 'LUCKY' boldly written on it."""
         full_prompt = LUCKY_prefix + "\n" + "LUCKY " + user_prompt
         output = replicate.run(
             "token-metrics/lucky-imagegen-iter1:" + LUCKY_VERSION,
