@@ -86,23 +86,19 @@ def upload_images_to_slack(image_data_list, channel_id, user_prompt):
     if not SLACK_BOT_TOKEN:
         return {"error": "SLACK_BOT_TOKEN not set or invalid."}
     
-    file_links = []
+    image_bytes_arr = []
+    file_name_arr = []
     for idx, image_data in enumerate(image_data_list):
         # Read bytes from the image file-like object.
         image_bytes = image_data.read()
         file_name = f"TMAI_{int(time.time())}_{idx+1}.png"
-        image_bytes_arr = []
-        file_name_arr = []
         image_bytes_arr.append(image_bytes)
         file_name_arr.append(file_name)
         #because we are sending multiple files, we need to send a list of file names and a list of image bytes
         result = upload_file_to_slack_external(file_name_arr, image_bytes_arr, channel_id, title=f"Generated image {idx+1}")
         if result.get("error"):
             return {"error": result.get("error")}
-
-
-        file_links.append(result.get("permalink", "No permalink found"))
-    return file_links
+    return 
 
 def process_image_generation(user_prompt, aspect_ratio, num_outputs, response_url, channel_id, character):
     print("Starting image generation with Replicate...")
@@ -165,7 +161,7 @@ def process_image_generation(user_prompt, aspect_ratio, num_outputs, response_ur
             print("Uploading image(s) to Slack using the new external upload methods...")
             slack_message = {
                 "response_type": "in_channel",
-                "text": "Here are your generated images:\n"
+                "text": "Generated images:\n"
             }
             image_public_urls = upload_images_to_slack(image_data, channel_id, user_prompt)
             if isinstance(image_public_urls, dict) and image_public_urls.get("error"):
@@ -247,7 +243,7 @@ def slack_command_endpoint(character):
     # Immediately respond to Slack to acknowledge receipt.
     ack_response = {
         "response_type": "in_channel",
-        "text": "User prompt: " + "\n"  + user_prompt
+        "text": "Processing your image... This might take a moment."
     }    
 
     # Start a background thread to process image generation.
