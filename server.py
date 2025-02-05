@@ -58,6 +58,8 @@ def upload_file_to_slack_external(file_name_arr, image_bytes_arr, channel_id, ti
             "title": file_name,
         }
         files_arr.append(file_info)
+    print("Finished appending all images")
+    print(f"Files array: {files_arr}")
     complete_payload = {
         "files": files_arr,
         "channel_id": channel_id
@@ -94,10 +96,10 @@ def upload_images_to_slack(image_data_list, channel_id, user_prompt):
         file_name = f"TMAI_{int(time.time())}_{idx+1}.png"
         image_bytes_arr.append(image_bytes)
         file_name_arr.append(file_name)
-        #because we are sending multiple files, we need to send a list of file names and a list of image bytes
-        result = upload_file_to_slack_external(file_name_arr, image_bytes_arr, channel_id, title=f"Generated image {idx+1}")
-        if result.get("error"):
-            return {"error": result.get("error")}
+    #because we are sending multiple files, we need to send a list of file names and a list of image bytes
+    result = upload_file_to_slack_external(file_name_arr, image_bytes_arr, channel_id, title=f"Generated image {idx+1}")
+    if result.get("error"):
+        return {"error": result.get("error")}
     return 
 
 def process_image_generation(user_prompt, aspect_ratio, num_outputs, response_url, channel_id, character):
