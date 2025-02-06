@@ -5,16 +5,21 @@ import replicate
 import threading
 import json
 import time
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env file
 
 app = Flask(__name__)
 
-# Replicate settings
-REPLICATE_API_TOKEN = os.environ.get("REPLICATE_API_TOKEN")
-TMAI_VERSION = "a3409648730239101538d4cf79f2fdb0e068a5c7e6509ad86ab3fae09c4d6ef8"
-LUCKY_VERSION = "499a35887d318d3e889af1a5968850fb8f2b508095c73d04b8734c5b018ec43e"
+# Get API keys from environment variables
+REPLICATE_API_TOKEN = os.environ.get('REPLICATE_API_TOKEN')
+SLACK_BOT_TOKEN = os.environ.get('SLACK_BOT_TOKEN')
+TMAI_VERSION = os.environ.get('TMAI_VERSION', "a3409648730239101538d4cf79f2fdb0e068a5c7e6509ad86ab3fae09c4d6ef8")
+LUCKY_VERSION = os.environ.get('LUCKY_VERSION', "499a35887d318d3e889af1a5968850fb8f2b508095c73d04b8734c5b018ec43e")
 
-# Slack settings (make sure this is a modern bot token with proper scopes)
-SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
+# Validate required environment variables
+if not REPLICATE_API_TOKEN or not SLACK_BOT_TOKEN:
+    raise ValueError("Missing required environment variables. Please set REPLICATE_API_TOKEN and SLACK_BOT_TOKEN")
 
 def upload_file_to_slack_external(file_name_arr, image_bytes_arr, channel_id, title=None, filetype="png"):
     file_ids = []
@@ -105,7 +110,7 @@ def upload_images_to_slack(image_data_list, channel_id, user_prompt):
 def process_image_generation(user_prompt, aspect_ratio, num_outputs, response_url, channel_id, character):
     print("Starting image generation with Replicate...")
     if character == "TMAI":
-        TMAI_prefix = """TMAI, a yellow robot which has a rounded rectangular head with black eyes. TMAI’s proportions are balanced, avoiding an overly exaggerated head-to-body ratio. TMAI’s size is equal to a 7-year-old kid."""
+        TMAI_prefix = """TMAI, a yellow robot which has a rounded rectangular head with black eyes. TMAI's proportions are balanced, avoiding an overly exaggerated head-to-body ratio. TMAI's size is equal to a 7-year-old kid."""
         full_prompt = TMAI_prefix + "\n" + "TMAI "+user_prompt
         output = replicate.run(
             "token-metrics/tmai-imagegen-iter3:" + TMAI_VERSION,
