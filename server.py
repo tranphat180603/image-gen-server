@@ -302,6 +302,8 @@ def slack_command_endpoint(character):
     
     full_prompt = char_prefix + "\n" + character + " " + enhanced_prompt
 
+    print(f"Full prompt with enhanced prompt: {full_prompt}")
+
     # Format the parameters
     params = []
     for idx, token in enumerate(tokens):
