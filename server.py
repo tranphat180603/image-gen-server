@@ -123,7 +123,6 @@ def process_image_generation(user_prompt, aspect_ratio, num_outputs, num_infer_s
                 "guidance_scale": 3,
                 "extra_lora_scale": 1,
                 "num_inference_steps": num_infer_steps,
-                "disable_safety_checker": False
             }
         output = replicate.run(
             "token-metrics/tmai-imagegen-iter3:" + TMAI_VERSION,
@@ -145,7 +144,7 @@ def process_image_generation(user_prompt, aspect_ratio, num_outputs, num_infer_s
             "prompt_strength": 0.8,
             "extra_lora_scale": 1,
             "num_inference_steps": num_infer_steps,
-            "disable_safety_checker": False
+            "disable_safety_checker": True
         }
         output = replicate.run(
             "token-metrics/lucky-imagegen-iter1:" + LUCKY_VERSION,
@@ -207,7 +206,7 @@ def slack_command_endpoint(character):
     aspect_ratio = "1:1"
     num_outputs = 4
     num_infer_steps = 50
-    lora_scale = 0.98
+    lora_scale = 0.96
 
     # Split input into prompt and parameter parts
     if "--" in text:
@@ -220,9 +219,24 @@ def slack_command_endpoint(character):
 
     tokens = params_text.split()
     idx = 0
+    text_to_render = None
+    
     while idx < len(tokens):
         token = tokens[idx]
-        if token in ["--aspect_ratio", "--ar"]:
+        if token == "--words":
+            if idx + 1 < len(tokens):
+                # Collect all text until the next parameter or end
+                text_parts = []
+                idx += 1
+                while idx < len(tokens) and not tokens[idx].startswith("--"):
+                    text_parts.append(tokens[idx])
+                    idx += 1
+                text_to_render = " ".join(text_parts)
+                # Add spacing to TMAI if it exists
+                if "TMAI" in text_to_render:
+                    text_to_render = text_to_render.replace("TMAI", "T M A I")
+                continue
+        elif token in ["--aspect_ratio", "--ar"]:
             if idx + 1 < len(tokens):
                 ar = tokens[idx + 1]
                 if ar in ["1:1", "16:9", "9:16", "21:9", "9:21"]:
@@ -261,17 +275,61 @@ def slack_command_endpoint(character):
                     if 0.8 <= sty <= 1:
                         lora_scale = sty
                     else:
-                        lora_scale = 0.98
+                        lora_scale = 0.96
                 except ValueError:
-                    lora_scale = 0.98
+                    lora_scale = 0.96
             idx += 2
         else:
             idx += 1
+
+    # If text_to_render exists, enhance the prompt
+    if text_to_render:
+        text_enhancement = f'''Clear, legible text that reads exactly "{text_to_render}", 
+        rendered in high contrast, sharp focus, centered composition,
+        professional typography, crisp edges, no distortion,
+        perfectly readable text, front-facing text, text stands out against the background,
+        each letter clearly defined and spaced'''
+        # Replace the --words parameter portion in the original prompt
+        user_prompt = user_prompt.replace("--words " + text_to_render, text_enhancement)
+
+    # Create the character prefix based on the character
+    if character == "TMAI":
+        char_prefix = """TMAI, a yellow robot which has a rounded rectangular head with black eyes. TMAI's proportions are balanced, avoiding an overly exaggerated head-to-body ratio. TMAI's size is equal to a 7-year-old kid."""
+    else:  # LUCKY
+        char_prefix = """LUCKY, an orange French bulldog with upright ears, always wearing a collar with the word 'LUCKY' boldly written on it."""
     
-    # Immediately respond to Slack to acknowledge receipt.
+    full_prompt = char_prefix + "\n" + character + " " + user_prompt
+
+    # Format the parameters
+    params = []
+    for idx, token in enumerate(tokens):
+        if token in ["--aspect_ratio", "--ar"] and idx + 1 < len(tokens):
+            params.append(f"`--ar {tokens[idx + 1]}`")
+        elif token == "--num_outputs" and idx + 1 < len(tokens):
+            params.append(f"`--num_outputs {tokens[idx + 1]}`")
+        elif token == "--detailed_level" and idx + 1 < len(tokens):
+            params.append(f"`--detailed_level {tokens[idx + 1]}`")
+        elif token == "--mascot_style" and idx + 1 < len(tokens):
+            params.append(f"`--mascot_style {tokens[idx + 1]}`")
+        elif token == "--words" and idx + 1 < len(tokens):
+            # Collect all text until the next parameter
+            text_parts = []
+            i = idx + 1
+            while i < len(tokens) and not tokens[i].startswith("--"):
+                text_parts.append(tokens[i])
+                i += 1
+            text = " ".join(text_parts)
+            params.append(f"`--words \"{text}\"`")
+
+    # Create formatted response with styled parameters
+    formatted_response = f"Processing your image... This might take a moment.\n\n*Processed prompt:*\n{full_prompt}"
+    if params:
+        formatted_response += f"\n{' '.join(params)}"
+
+    # Immediately respond to Slack to acknowledge receipt with the processed prompt
     ack_response = {
         "response_type": "in_channel",
-        "text": "Processing your image... This might take a moment."
+        "text": formatted_response
     }    
 
     # Start a background thread to process image generation.
