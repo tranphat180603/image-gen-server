@@ -107,50 +107,54 @@ def upload_images_to_slack(image_data_list, channel_id, user_prompt):
         return {"error": result.get("error")}
     return 
 
-def process_image_generation(user_prompt, aspect_ratio, num_outputs, num_infer_steps, extra_lora_scale ,response_url, channel_id, character):
+def process_image_generation(user_prompt, aspect_ratio, num_outputs, num_infer_steps, lora_scale, response_url, channel_id, character):
     print("Starting image generation with Replicate...")
     if character == "TMAI":
         TMAI_prefix = """TMAI, a yellow robot which has a rounded rectangular head with black eyes. TMAI's proportions are balanced, avoiding an overly exaggerated head-to-body ratio. TMAI's size is equal to a 7-year-old kid."""
         full_prompt = TMAI_prefix + "\n" + "TMAI "+user_prompt
-        output = replicate.run(
-            "token-metrics/tmai-imagegen-iter3:" + TMAI_VERSION,
-            input={
+        inputs = {
                 "prompt": full_prompt,
                 "model": "dev",
                 "go_fast": False,
-                "lora_scale": 0.98,
+                "lora_scale": lora_scale,
                 "num_outputs": num_outputs,
                 "aspect_ratio": aspect_ratio,
                 "output_format": "png",
                 "guidance_scale": 3,
-                "extra_lora_scale": extra_lora_scale,
+                "extra_lora_scale": 1,
                 "num_inference_steps": num_infer_steps,
                 "disable_safety_checker": False
             }
+        output = replicate.run(
+            "token-metrics/tmai-imagegen-iter3:" + TMAI_VERSION,
+            input=inputs
         )
     elif character == "LUCKY":
         LUCKY_prefix = """LUCKY, an orange French bulldog with upright ears, always wearing a collar with the word 'LUCKY' boldly written on it."""
         full_prompt = LUCKY_prefix + "\n" + "LUCKY " + user_prompt
+        inputs = {
+            "prompt": full_prompt,
+            "model": "dev",
+            "go_fast": False,
+            "lora_scale": lora_scale,
+            "num_outputs": num_outputs,
+            "aspect_ratio": aspect_ratio,
+            "output_format": "png",
+            "guidance_scale": 3,
+            "output_quality": 80,
+            "prompt_strength": 0.8,
+            "extra_lora_scale": 1,
+            "num_inference_steps": num_infer_steps,
+            "disable_safety_checker": False
+        }
         output = replicate.run(
             "token-metrics/lucky-imagegen-iter1:" + LUCKY_VERSION,
-            input={
-                "prompt": full_prompt,
-                "model": "dev",
-                "go_fast": False,
-                "lora_scale": 1,
-                "num_outputs": num_outputs,
-                "aspect_ratio": aspect_ratio,
-                "output_format": "png",
-                "guidance_scale": 3,
-                "output_quality": 80,
-                "prompt_strength": 0.8,
-                "extra_lora_scale": extra_lora_scale,
-                "num_inference_steps": num_infer_steps,
-                "disable_safety_checker": False
-            }
+            input= inputs
         )
     print("Full prompt sent to Replicate:")
     print(full_prompt)
+    print("Params:")
+    print(inputs)
 
     # Decide on the image data list based on the number of outputs
     if num_outputs == 1:
@@ -203,7 +207,7 @@ def slack_command_endpoint(character):
     aspect_ratio = "1:1"
     num_outputs = 4
     num_infer_steps = 50
-    extra_lora_scale = 0.98
+    lora_scale = 0.98
 
     # Split input into prompt and parameter parts
     if "--" in text:
@@ -213,9 +217,6 @@ def slack_command_endpoint(character):
     else:
         user_prompt = text.strip()
         params_text = ""
-
-    print("User prompt:", user_prompt)
-    print("Params text:", params_text)
 
     tokens = params_text.split()
     idx = 0
@@ -258,16 +259,14 @@ def slack_command_endpoint(character):
                 try:
                     sty = float(tokens[idx + 1])
                     if 0.8 <= sty <= 1:
-                        extra_lora_scale = sty
+                        lora_scale = sty
                     else:
-                        extra_lora_scale = 0.98
+                        lora_scale = 0.98
                 except ValueError:
-                    extra_lora_scale = 0.98
+                    lora_scale = 0.98
             idx += 2
         else:
             idx += 1
-
-    print(f"Parsed parameters: aspect_ratio={aspect_ratio}, num_outputs={num_outputs}, num_inference_steps={num_infer_steps}, extra_lora_scale={extra_lora_scale}")
     
     # Immediately respond to Slack to acknowledge receipt.
     ack_response = {
@@ -278,7 +277,7 @@ def slack_command_endpoint(character):
     # Start a background thread to process image generation.
     thread = threading.Thread(
         target=process_image_generation,
-        args=(user_prompt, aspect_ratio, num_outputs, num_infer_steps, extra_lora_scale, response_url, channel_id, character)
+        args=(user_prompt, aspect_ratio, num_outputs, num_infer_steps, lora_scale, response_url, channel_id, character)
     )
     thread.start()
     
