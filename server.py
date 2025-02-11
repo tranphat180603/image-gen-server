@@ -232,6 +232,7 @@ def slack_command_endpoint(character):
                     text_parts.append(tokens[idx])
                     idx += 1
                 text_to_render = " ".join(text_parts)
+                print(f"Text to render: {text_to_render}")
                 # Add spacing to TMAI if it exists
                 if "TMAI" in text_to_render:
                     text_to_render = text_to_render.replace("TMAI", "T M A I")
