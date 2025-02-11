@@ -244,7 +244,7 @@ def slack_command_endpoint(character):
         elif token == "--detailed_level":
             if idx + 1 < len(tokens):
                 try:
-                    lev = int(tokens[idx + 1])
+                    lev = tokens[idx + 1]
                     if lev == "high":
                         num_infer_steps = 50
                     elif lev == "medium":
@@ -258,12 +258,13 @@ def slack_command_endpoint(character):
             if idx + 1 < len(tokens):
                 try:
                     sty = int(tokens[idx + 1])
-                    if lev <= 1 and lev >= 0.8:
+                    if sty <= 1 and sty >= 0.8:
                         extra_lora_scale = sty
                     else:
                         extra_lora_scale = 0.98
                 except ValueError:
                     extra_lora_scale = 0.98
+            idx += 2
         else:
             idx += 1
 
