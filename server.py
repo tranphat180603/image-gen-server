@@ -232,7 +232,6 @@ def slack_command_endpoint(character):
                     text_parts.append(tokens[idx])
                     idx += 1
                 text_to_render = " ".join(text_parts)
-                print(f"Text to render: {text_to_render}")
                 # Add spacing to TMAI if it exists
                 if "TMAI" in text_to_render:
                     text_to_render = text_to_render.replace("TMAI", "T M A I")
@@ -292,6 +291,7 @@ def slack_command_endpoint(character):
         each letter clearly defined and spaced'''
         # Replace the entire "--words" parameter portion in the original prompt
         words_part = f"--words {text_to_render}"
+        print(f"Text to render: {text_to_render}")
         for token in tokens:
             if token == "--words":
                 start_idx = text.find(words_part)
@@ -300,6 +300,8 @@ def slack_command_endpoint(character):
                     break
     else:
         enhanced_prompt = user_prompt
+
+        print(f"Enhanced prompt: {enhanced_prompt}")
 
     # Create the character prefix based on the character
     if character == "TMAI":
