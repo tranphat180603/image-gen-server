@@ -125,7 +125,7 @@ def process_image_generation(user_prompt, aspect_ratio, num_outputs, num_infer_s
                 "guidance_scale": 3.5,
                 "extra_lora_scale": extra_lora_scale,
                 "num_inference_steps": num_infer_steps,
-                "disable_safety_checker": True
+                "disable_safety_checker": False
             }
         )
     elif character == "LUCKY":
@@ -147,7 +147,7 @@ def process_image_generation(user_prompt, aspect_ratio, num_outputs, num_infer_s
                 "prompt_strength": 0.8,
                 "extra_lora_scale": extra_lora_scale,
                 "num_inference_steps": num_infer_steps,
-                "disable_safety_checker": True
+                "disable_safety_checker": False
             }
         )
     print("Full prompt sent to Replicate:")
@@ -258,7 +258,7 @@ def slack_command_endpoint(character):
             if idx + 1 < len(tokens):
                 try:
                     sty = int(tokens[idx + 1])
-                    if lev <= 1 and lev >= 0.95:
+                    if lev <= 1 and lev >= 0.8:
                         extra_lora_scale = sty
                     else:
                         extra_lora_scale = 0.98
