@@ -222,7 +222,7 @@ def slack_command_endpoint(character):
     idx = 0
     while idx < len(tokens):
         token = tokens[idx]
-        if token == "--aspect_ratio" or "--ar":
+        if token in ["--aspect_ratio", "--ar"]:
             if idx + 1 < len(tokens):
                 ar = tokens[idx + 1]
                 if ar in ["1:1", "16:9", "9:16", "21:9", "9:21"]:
@@ -257,8 +257,8 @@ def slack_command_endpoint(character):
         elif token == "--mascot_style":
             if idx + 1 < len(tokens):
                 try:
-                    sty = int(tokens[idx + 1])
-                    if sty <= 1 and sty >= 0.8:
+                    sty = float(tokens[idx + 1])
+                    if 0.8 <= sty <= 1:
                         extra_lora_scale = sty
                     else:
                         extra_lora_scale = 0.98
