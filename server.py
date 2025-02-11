@@ -107,7 +107,7 @@ def upload_images_to_slack(image_data_list, channel_id, user_prompt):
         return {"error": result.get("error")}
     return 
 
-def process_image_generation(user_prompt, aspect_ratio, num_outputs, response_url, channel_id, character):
+def process_image_generation(user_prompt, aspect_ratio, num_outputs, num_infer_steps, extra_lora_scale ,response_url, channel_id, character):
     print("Starting image generation with Replicate...")
     if character == "TMAI":
         TMAI_prefix = """TMAI, a yellow robot which has a rounded rectangular head with black eyes. TMAI's proportions are balanced, avoiding an overly exaggerated head-to-body ratio. TMAI's size is equal to a 7-year-old kid."""
@@ -278,7 +278,7 @@ def slack_command_endpoint(character):
     # Start a background thread to process image generation.
     thread = threading.Thread(
         target=process_image_generation,
-        args=(user_prompt, aspect_ratio, num_outputs, response_url, channel_id, character)
+        args=(user_prompt, aspect_ratio, num_outputs, num_infer_steps, extra_lora_scale, response_url, channel_id, character)
     )
     thread.start()
     
