@@ -298,7 +298,7 @@ def slack_command_endpoint(character):
     enhanced_prompt = user_prompt
     if text_to_render:
         text_enhancement = (
-            f"clear, legible text that reads exactly \"{text_to_render}\", "
+            f"Clear, legible text that reads exactly \"{text_to_render}\", "
             "rendered in high contrast, sharp focus, centered composition, "
             "professional typography, crisp edges, no distortion, "
             "perfectly readable text, front-facing text, text stands out against the background, "
@@ -320,7 +320,7 @@ def slack_command_endpoint(character):
             "LUCKY, an orange French bulldog with upright ears, always wearing a collar with the word 'LUCKY' boldly written on it."
         )
     
-    full_prompt = f"{char_prefix}\n{character} {enhanced_prompt}"
+    full_prompt = f"{char_prefix}\n{character}\n{enhanced_prompt}"
     print(f"Full prompt with enhanced prompt: {full_prompt}")
 
     # Format the parameters for display.
@@ -343,14 +343,14 @@ def slack_command_endpoint(character):
             text_param = " ".join(text_parts)
             params.append(f"`--words \"{text_param}\"`")
 
-    formatted_response = f"Processing your image... This might take a moment.\n\n*Processed prompt:*\n{full_prompt}"
+    formatted_response = f"Processing your image... This might take a moment.\n\n*Prompt:*\n{user_prompt}"
     if params:
         formatted_response += f"\n{' '.join(params)}"
 
     # Immediately acknowledge receipt to Slack.
     ack_response = {
         "response_type": "in_channel",
-        "text": formatted_response
+        "text": f"Params: {formatted_response}"
     }
 
     # Start a background thread to process image generation.
