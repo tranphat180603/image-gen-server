@@ -119,15 +119,12 @@ def process_image_generation(user_prompt, aspect_ratio, num_outputs, response_ur
                 "model": "dev",
                 "go_fast": False,
                 "lora_scale": 1,
-                "megapixels": "1",
                 "num_outputs": num_outputs,
                 "aspect_ratio": aspect_ratio,
                 "output_format": "png",
-                "guidance_scale": 3,
-                "output_quality": 80,
-                "prompt_strength": 0.8,
-                "extra_lora_scale": 1,
-                "num_inference_steps": 28,
+                "guidance_scale": 3.5,
+                "extra_lora_scale": extra_lora_scale,
+                "num_inference_steps": num_infer_steps,
                 "disable_safety_checker": True
             }
         )
@@ -148,8 +145,8 @@ def process_image_generation(user_prompt, aspect_ratio, num_outputs, response_ur
                 "guidance_scale": 3,
                 "output_quality": 80,
                 "prompt_strength": 0.8,
-                "extra_lora_scale": 1,
-                "num_inference_steps": 28,
+                "extra_lora_scale": extra_lora_scale,
+                "num_inference_steps": num_infer_steps,
                 "disable_safety_checker": True
             }
         )
@@ -206,6 +203,8 @@ def slack_command_endpoint(character):
     # Default parameter values
     aspect_ratio = "1:1"
     num_outputs = 4
+    num_infer_steps = 50
+    extra_lora_scale = 0.98
 
     # Split input into prompt and parameter parts
     if "--" in text:
@@ -223,7 +222,7 @@ def slack_command_endpoint(character):
     idx = 0
     while idx < len(tokens):
         token = tokens[idx]
-        if token == "--aspect_ratio":
+        if token == "--aspect_ratio" or "--ar":
             if idx + 1 < len(tokens):
                 ar = tokens[idx + 1]
                 if ar in ["1:1", "16:9", "9:16", "21:9", "9:21"]:
@@ -242,10 +241,29 @@ def slack_command_endpoint(character):
                 except ValueError:
                     num_outputs = 4
             idx += 2
+        elif token == "--detailed_level":
+            if idx + 1 < len(tokens):
+                try:
+                    lev = int(tokens[idx + 1])
+                    if lev == "high":
+                        num_infer_steps = 50
+                    elif lev == "medium":
+                        num_infer_steps = 40
+                    elif lev == "low":
+                        num_infer_steps = 28
+            idx += 2
+        elif token == "--mascot_style":
+            if idx + 1 < len(tokens):
+                try:
+                    sty = int(tokens[idx + 1])
+                    if lev <= 1 and lev >= 0.95:
+                        extra_lora_scale = sty
+                    else:
+                        extra_lora_scale = 1
         else:
             idx += 1
 
-    print(f"Parsed parameters: aspect_ratio={aspect_ratio}, num_outputs={num_outputs}")
+    print(f"Parsed parameters: aspect_ratio={aspect_ratio}, num_outputs={num_outputs}, num_inference_steps={num_infer_steps}, extra_lora_scale={extra_lora_scale}")
     
     # Immediately respond to Slack to acknowledge receipt.
     ack_response = {
