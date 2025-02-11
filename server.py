@@ -101,35 +101,42 @@ def upload_images_to_slack(image_data_list, channel_id, user_prompt):
         file_name = f"TMAI_{int(time.time())}_{idx+1}.png"
         image_bytes_arr.append(image_bytes)
         file_name_arr.append(file_name)
-    #because we are sending multiple files, we need to send a list of file names and a list of image bytes
+    # Because we are sending multiple files, we need to send a list of file names and a list of image bytes.
     result = upload_file_to_slack_external(file_name_arr, image_bytes_arr, channel_id, title=f"Generated image {idx+1}")
     if result.get("error"):
         return {"error": result.get("error")}
     return 
 
+
 def process_image_generation(user_prompt, aspect_ratio, num_outputs, num_infer_steps, lora_scale, response_url, channel_id, character):
     print("Starting image generation with Replicate...")
     if character == "TMAI":
-        TMAI_prefix = """TMAI, a yellow robot which has a rounded rectangular head with black eyes. TMAI's proportions are balanced, avoiding an overly exaggerated head-to-body ratio. TMAI's size is equal to a 7-year-old kid."""
+        TMAI_prefix = (
+            "TMAI, a yellow robot which has a rounded rectangular head with black eyes. "
+            "TMAI's proportions are balanced, avoiding an overly exaggerated head-to-body ratio. "
+            "TMAI's size is equal to a 7-year-old kid."
+        )
         full_prompt = TMAI_prefix + "\n" + "TMAI " + user_prompt
         inputs = {
-                "prompt": full_prompt,
-                "model": "dev",
-                "go_fast": False,
-                "lora_scale": lora_scale,
-                "num_outputs": num_outputs,
-                "aspect_ratio": aspect_ratio,
-                "output_format": "png",
-                "guidance_scale": 3,
-                "extra_lora_scale": 1,
-                "num_inference_steps": num_infer_steps,
-            }
+            "prompt": full_prompt,
+            "model": "dev",
+            "go_fast": False,
+            "lora_scale": lora_scale,
+            "num_outputs": num_outputs,
+            "aspect_ratio": aspect_ratio,
+            "output_format": "png",
+            "guidance_scale": 3,
+            "extra_lora_scale": 1,
+            "num_inference_steps": num_infer_steps,
+        }
         output = replicate.run(
             "token-metrics/tmai-imagegen-iter3:" + TMAI_VERSION,
             input=inputs
         )
     elif character == "LUCKY":
-        LUCKY_prefix = """LUCKY, an orange French bulldog with upright ears, always wearing a collar with the word 'LUCKY' boldly written on it."""
+        LUCKY_prefix = (
+            "LUCKY, an orange French bulldog with upright ears, always wearing a collar with the word 'LUCKY' boldly written on it."
+        )
         full_prompt = LUCKY_prefix + "\n" + "LUCKY " + user_prompt
         inputs = {
             "prompt": full_prompt,
@@ -148,7 +155,7 @@ def process_image_generation(user_prompt, aspect_ratio, num_outputs, num_infer_s
         }
         output = replicate.run(
             "token-metrics/lucky-imagegen-iter1:" + LUCKY_VERSION,
-            input= inputs
+            input=inputs
         )
     print("Full prompt sent to Replicate:")
     print(full_prompt)
@@ -162,6 +169,7 @@ def process_image_generation(user_prompt, aspect_ratio, num_outputs, num_infer_s
         image_data = output
     else:
         image_data = [output[0]] if output else None
+
     try:
         if image_data:
             print("Uploading image(s) to Slack using the new external upload methods...")
@@ -193,6 +201,7 @@ def process_image_generation(user_prompt, aspect_ratio, num_outputs, num_infer_s
     resp = requests.post(response_url, json=slack_message)
     print(f"Slack response update status: {resp.status_code}, body: {resp.text}")
 
+
 def slack_command_endpoint(character):
     channel_id = request.form.get("channel_id")
     response_url = request.form.get("response_url")
@@ -208,7 +217,8 @@ def slack_command_endpoint(character):
     num_infer_steps = 50
     lora_scale = 0.96
 
-    # Split input into prompt and parameter parts
+    # Split the text into the user prompt (everything before the first parameter marker)
+    # and the parameter text. This means the part after the first "--" is considered parameters.
     if "--" in text:
         parts = text.split("--", 1)
         user_prompt = parts[0].strip()
@@ -218,21 +228,21 @@ def slack_command_endpoint(character):
         params_text = ""
 
     tokens = params_text.split()
-    idx = 0
     text_to_render = None
-    
+    idx = 0
+
+    # Process tokens to extract parameters and the special --words text.
     while idx < len(tokens):
         token = tokens[idx]
         if token == "--words":
             if idx + 1 < len(tokens):
-                # Collect all text until the next parameter or end
                 text_parts = []
                 idx += 1
                 while idx < len(tokens) and not tokens[idx].startswith("--"):
                     text_parts.append(tokens[idx])
                     idx += 1
                 text_to_render = " ".join(text_parts)
-                # Add spacing to TMAI if it exists
+                # Replace "TMAI" with spaced-out version if needed.
                 if "TMAI" in text_to_render:
                     text_to_render = text_to_render.replace("TMAI", "T M A I")
                 continue
@@ -282,38 +292,38 @@ def slack_command_endpoint(character):
         else:
             idx += 1
 
-    # Initialize enhanced_prompt with the user_prompt first
+    # Build the enhanced prompt.
+    # Instead of attempting to replace the parameter text within the prompt,
+    # we simply append the enhancement if a --words value was provided.
     enhanced_prompt = user_prompt
-
-    # If text_to_render exists, enhance the prompt
     if text_to_render:
-        text_enhancement = f'''Clear, legible text that reads exactly "{text_to_render}", 
-        rendered in high contrast, sharp focus, centered composition,
-        professional typography, crisp edges, no distortion,
-        perfectly readable text, front-facing text, text stands out against the background,
-        each letter clearly defined and spaced'''
-        # Replace the entire "--words" parameter portion in the original prompt
-        words_part = f"--words {text_to_render}"
-        for token in tokens:
-            if token == "--words":
-                start_idx = user_prompt.find(words_part)
-                if start_idx != -1:
-                    enhanced_prompt = user_prompt[:start_idx] + text_enhancement + user_prompt[start_idx + len(words_part):]
-                break
+        text_enhancement = (
+            f"Clear, legible text that reads exactly \"{text_to_render}\", "
+            "rendered in high contrast, sharp focus, centered composition, "
+            "professional typography, crisp edges, no distortion, "
+            "perfectly readable text, front-facing text, text stands out against the background, "
+            "each letter clearly defined and spaced."
+        )
+        enhanced_prompt = f"{user_prompt}\n{text_enhancement}"
 
     print(f"Enhanced prompt: {enhanced_prompt}")
 
-    # Create the character prefix based on the character
+    # Create the character prefix based on the character.
     if character == "TMAI":
-        char_prefix = """TMAI, a yellow robot which has a rounded rectangular head with black eyes. TMAI's proportions are balanced, avoiding an overly exaggerated head-to-body ratio. TMAI's size is equal to a 7-year-old kid."""
+        char_prefix = (
+            "TMAI, a yellow robot which has a rounded rectangular head with black eyes. "
+            "TMAI's proportions are balanced, avoiding an overly exaggerated head-to-body ratio. "
+            "TMAI's size is equal to a 7-year-old kid."
+        )
     else:  # LUCKY
-        char_prefix = """LUCKY, an orange French bulldog with upright ears, always wearing a collar with the word 'LUCKY' boldly written on it."""
+        char_prefix = (
+            "LUCKY, an orange French bulldog with upright ears, always wearing a collar with the word 'LUCKY' boldly written on it."
+        )
     
-    full_prompt = char_prefix + "\n" + character + " " + enhanced_prompt
-
+    full_prompt = f"{char_prefix}\n{character} {enhanced_prompt}"
     print(f"Full prompt with enhanced prompt: {full_prompt}")
 
-    # Format the parameters
+    # Format the parameters for display.
     params = []
     for idx, token in enumerate(tokens):
         if token in ["--aspect_ratio", "--ar"] and idx + 1 < len(tokens):
@@ -325,27 +335,25 @@ def slack_command_endpoint(character):
         elif token == "--mascot_style" and idx + 1 < len(tokens):
             params.append(f"`--mascot_style {tokens[idx + 1]}`")
         elif token == "--words" and idx + 1 < len(tokens):
-            # Collect all text until the next parameter
             text_parts = []
             i = idx + 1
             while i < len(tokens) and not tokens[i].startswith("--"):
                 text_parts.append(tokens[i])
                 i += 1
-            text = " ".join(text_parts)
-            params.append(f"`--words \"{text}\"`")
+            text_param = " ".join(text_parts)
+            params.append(f"`--words \"{text_param}\"`")
 
-    # Create formatted response with styled parameters
     formatted_response = f"Processing your image... This might take a moment.\n\n*Processed prompt:*\n{full_prompt}"
     if params:
         formatted_response += f"\n{' '.join(params)}"
 
-    # Immediately respond to Slack to acknowledge receipt with the processed prompt
+    # Immediately acknowledge receipt to Slack.
     ack_response = {
         "response_type": "in_channel",
         "text": formatted_response
-    }    
+    }
 
-    # Start a background thread to process image generation with enhanced prompt
+    # Start a background thread to process image generation.
     thread = threading.Thread(
         target=process_image_generation,
         args=(enhanced_prompt, aspect_ratio, num_outputs, num_infer_steps, lora_scale, response_url, channel_id, character)
@@ -354,13 +362,16 @@ def slack_command_endpoint(character):
     
     return jsonify(ack_response)
 
+
 @app.route('/slack/TMAI', methods=['POST'])
 def slack_TMAI_endpoint():
-    return slack_command_endpoint(character = "TMAI")
+    return slack_command_endpoint(character="TMAI")
+
 
 @app.route('/slack/LUCKY', methods=['POST'])
 def slack_LUCKY_endpoint():
-    return slack_command_endpoint(character = "LUCKY")
+    return slack_command_endpoint(character="LUCKY")
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
