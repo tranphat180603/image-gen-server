@@ -298,13 +298,13 @@ def slack_command_endpoint(character):
     enhanced_prompt = user_prompt
     if text_to_render:
         text_enhancement = (
-            f"Clear, legible text that reads exactly \"{text_to_render}\", "
+            f"clear, legible text that reads exactly \"{text_to_render}\", "
             "rendered in high contrast, sharp focus, centered composition, "
             "professional typography, crisp edges, no distortion, "
             "perfectly readable text, front-facing text, text stands out against the background, "
             "each letter clearly defined and spaced."
         )
-        enhanced_prompt = f"{user_prompt}\n{text_enhancement}"
+        enhanced_prompt = f"{user_prompt} {text_enhancement}"
 
     print(f"Enhanced prompt: {enhanced_prompt}")
 
