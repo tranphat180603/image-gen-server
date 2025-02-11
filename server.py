@@ -111,7 +111,7 @@ def process_image_generation(user_prompt, aspect_ratio, num_outputs, num_infer_s
     print("Starting image generation with Replicate...")
     if character == "TMAI":
         TMAI_prefix = """TMAI, a yellow robot which has a rounded rectangular head with black eyes. TMAI's proportions are balanced, avoiding an overly exaggerated head-to-body ratio. TMAI's size is equal to a 7-year-old kid."""
-        full_prompt = TMAI_prefix + "\n" + "TMAI "+user_prompt
+        full_prompt = TMAI_prefix + "\n" + "TMAI " + user_prompt
         inputs = {
                 "prompt": full_prompt,
                 "model": "dev",
@@ -290,7 +290,9 @@ def slack_command_endpoint(character):
         perfectly readable text, front-facing text, text stands out against the background,
         each letter clearly defined and spaced'''
         # Replace the --words parameter portion in the original prompt
-        user_prompt = user_prompt.replace("--words " + text_to_render, text_enhancement)
+        enhanced_prompt = user_prompt.replace("--words " + text_to_render, text_enhancement)
+    else:
+        enhanced_prompt = user_prompt
 
     # Create the character prefix based on the character
     if character == "TMAI":
@@ -298,7 +300,7 @@ def slack_command_endpoint(character):
     else:  # LUCKY
         char_prefix = """LUCKY, an orange French bulldog with upright ears, always wearing a collar with the word 'LUCKY' boldly written on it."""
     
-    full_prompt = char_prefix + "\n" + character + " " + user_prompt
+    full_prompt = char_prefix + "\n" + character + " " + enhanced_prompt
 
     # Format the parameters
     params = []
@@ -332,10 +334,10 @@ def slack_command_endpoint(character):
         "text": formatted_response
     }    
 
-    # Start a background thread to process image generation.
+    # Start a background thread to process image generation with enhanced prompt
     thread = threading.Thread(
         target=process_image_generation,
-        args=(user_prompt, aspect_ratio, num_outputs, num_infer_steps, lora_scale, response_url, channel_id, character)
+        args=(enhanced_prompt, aspect_ratio, num_outputs, num_infer_steps, lora_scale, response_url, channel_id, character)
     )
     thread.start()
     
