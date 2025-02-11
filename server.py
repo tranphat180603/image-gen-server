@@ -251,6 +251,8 @@ def slack_command_endpoint(character):
                         num_infer_steps = 40
                     elif lev == "low":
                         num_infer_steps = 28
+                except ValueError:
+                    num_infer_steps = 50
             idx += 2
         elif token == "--mascot_style":
             if idx + 1 < len(tokens):
@@ -259,7 +261,9 @@ def slack_command_endpoint(character):
                     if lev <= 1 and lev >= 0.95:
                         extra_lora_scale = sty
                     else:
-                        extra_lora_scale = 1
+                        extra_lora_scale = 0.98
+                except ValueError:
+                    extra_lora_scale = 0.98
         else:
             idx += 1
 
