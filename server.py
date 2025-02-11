@@ -282,6 +282,9 @@ def slack_command_endpoint(character):
         else:
             idx += 1
 
+    # Initialize enhanced_prompt with the user_prompt first
+    enhanced_prompt = user_prompt
+
     # If text_to_render exists, enhance the prompt
     if text_to_render:
         text_enhancement = f'''Clear, legible text that reads exactly "{text_to_render}", 
@@ -291,17 +294,14 @@ def slack_command_endpoint(character):
         each letter clearly defined and spaced'''
         # Replace the entire "--words" parameter portion in the original prompt
         words_part = f"--words {text_to_render}"
-        print(f"Text to render: {text_to_render}")
         for token in tokens:
             if token == "--words":
-                start_idx = text.find(words_part)
+                start_idx = user_prompt.find(words_part)
                 if start_idx != -1:
-                    enhanced_prompt = text[:start_idx] + text_enhancement + text[start_idx + len(words_part):]
-                    break
-    else:
-        enhanced_prompt = user_prompt
+                    enhanced_prompt = user_prompt[:start_idx] + text_enhancement + user_prompt[start_idx + len(words_part):]
+                break
 
-        print(f"Enhanced prompt: {enhanced_prompt}")
+    print(f"Enhanced prompt: {enhanced_prompt}")
 
     # Create the character prefix based on the character
     if character == "TMAI":
