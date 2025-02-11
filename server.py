@@ -289,8 +289,14 @@ def slack_command_endpoint(character):
         professional typography, crisp edges, no distortion,
         perfectly readable text, front-facing text, text stands out against the background,
         each letter clearly defined and spaced'''
-        # Replace the --words parameter portion in the original prompt
-        enhanced_prompt = user_prompt.replace("--words " + text_to_render, text_enhancement)
+        # Replace the entire "--words" parameter portion in the original prompt
+        words_part = f"--words {text_to_render}"
+        for token in tokens:
+            if token == "--words":
+                start_idx = text.find(words_part)
+                if start_idx != -1:
+                    enhanced_prompt = text[:start_idx] + text_enhancement + text[start_idx + len(words_part):]
+                    break
     else:
         enhanced_prompt = user_prompt
 
